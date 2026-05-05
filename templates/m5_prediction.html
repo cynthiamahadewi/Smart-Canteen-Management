@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Canteen Management System</title>
+  <link rel="stylesheet" href="/static/css/m5.css">
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- 左侧导航栏 -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">C</div>
+      <div>
+        <div class="brand-name">CANTEEN</div>
+        <div class="brand-sub">Management System</div>
+      </div>
+    </div>
+    <nav>
+      <a class="nav-item active" href="#">
+        <span class="nav-icon">⊞</span> Plate Analysis
+      </a>
+      <a class="nav-item" href="/optimization"> 
+        <span class="nav-icon">⊟</span> Optimization
+      </a>
+    </nav>
+  </aside>
+
+  <!-- 右侧内容区 -->
+  <div class="content">
+
+    <!-- 顶部 banner -->
+    <div class="banner">
+      <img src="/static/images/food_bg.jpeg" alt="banner">
+      <div class="banner-overlay">
+        <div class="banner-title">Smart Canteen</div>
+        <div class="banner-sub">AI-powered plate consumption analysis</div>
+      </div>
+    </div>
+
+    <!-- 主体两栏 -->
+    <div class="main-grid">
+
+      <!-- 左栏：上传 + preset -->
+      <div class="card">
+        <div class="card-title">
+          <span class="dot blue"></span> Plate Photo Upload
+        </div>
+
+        <!-- Tab -->
+        <div class="tab-row">
+          <button class="tab active" id="tab-upload"
+                  onclick="switchTab('upload')">Upload photo</button>
+          <button class="tab" id="tab-preset"
+                  onclick="switchTab('preset')">Use preset</button>
+        </div>
+
+        <!-- Upload mode -->
+        <div id="mode-upload">
+          <div class="drop-zone" id="dropzone">
+            <input type="file" id="fileInput" accept="image/*"
+                   onchange="handleUpload(this.files)">
+            <svg width="30" height="30" viewBox="0 0 30 30" fill="none"
+                 stroke="currentColor" stroke-width="1.2"
+                 style="opacity:.35;margin-bottom:8px">
+              <rect x="2" y="3" width="26" height="22" rx="3"/>
+              <circle cx="15" cy="13" r="5"/>
+            </svg>
+            <div class="dz-text">Drag & drop or click to upload</div>
+            <div class="dz-sub">JPG · PNG</div>
+          </div>
+          <div id="upload-preview" class="preview-box" style="display:none">
+            <img id="upload-img" src="" alt="uploaded">
+          </div>
+        </div>
+
+        <!-- Preset mode -->
+        <div id="mode-preset" style="display:none">
+          <select id="presetSelect" class="select-box"
+                  onchange="previewPreset()">
+            <option value="">-- Select a menu --</option>
+            {% for n in menus %}
+            <option value="menu{{ n }}">Menu {{ n }}</option>
+            {% endfor %}
+          </select>
+          <div id="preset-preview" style="display:none">
+            <div class="preview-pair">
+              <div class="preview-item">
+                <div class="preview-label">Before meal</div>
+                <img id="before-img" src="" alt="before">
+              </div>
+              <div class="preview-item">
+                <div class="preview-label">After meal</div>
+                <img id="after-img" src="" alt="after">
+              </div>
+            </div>
+            <button class="btn-primary" onclick="runPreset()">
+              Analyse this plate
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右栏：结果 -->
+      <div class="card">
+        <div class="card-title">
+          <span class="dot green"></span> M5 Model Output
+        </div>
+
+        <div id="result-idle" class="idle-msg">
+          Upload or select a plate photo to see predictions
+        </div>
+
+        <div id="result-body" style="display:none">
+
+          <!-- Ratio -->
+          <div class="section-label">Consumption ratio</div>
+          <div class="ratio-row">
+            <div class="ratio-number" id="res-ratio">—</div>
+            <div class="bin-pill" id="res-bin">—</div>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="res-bar" style="width:0%"></div>
+          </div>
+          <div class="progress-labels">
+            <span>0%</span><span>100%</span>
+          </div>
+
+          <!-- CORAL -->
+          <div class="section-label" style="margin-top:18px">
+            CORAL thresholds
+            <span class="hint">confidence per bin boundary</span>
+          </div>
+          <div class="coral-grid" id="coral-grid"></div>
+
+          <!-- Top-3 -->
+          <div class="section-label" style="margin-top:18px">
+            Top-3 food recognition
+          </div>
+          <div id="top3-list"></div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/m5.js"></script>
+</body>
+</html>

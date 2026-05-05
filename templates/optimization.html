@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Canteen Management - Optimization</title>
+  <link rel="stylesheet" href="/static/css/m5.css">
+  <style>
+    .opt-table-wrap { overflow-x: auto; margin-top: 12px; }
+    .opt-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+    .opt-table thead tr { background: #5d4037; color: #fff; }
+    .opt-table th,
+    .opt-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #e0d7c6; }
+    .opt-table tbody tr:hover { background: #fdf5e6; }
+    .optimized-val { color: #2e7d32; font-weight: 700; font-size: 1.05em; }
+    .idle-msg { color: #999; font-size: 0.95em; padding: 24px 0; text-align: center; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- Sidebar — identical structure to m5_prediction -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">C</div>
+      <div>
+        <div class="brand-name">CANTEEN</div>
+        <div class="brand-sub">Management System</div>
+      </div>
+    </div>
+    <nav>
+      <a class="nav-item" href="/">
+        <span class="nav-icon">⊞</span> Plate Analysis
+      </a>
+      <a class="nav-item active" href="/optimization">
+        <span class="nav-icon">⊟</span> Optimization
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main content -->
+  <div class="content">
+
+    <!-- Banner — same as m5_prediction -->
+    <div class="banner">
+      <img src="/static/images/food_bg.jpeg" alt="banner">
+      <div class="banner-overlay">
+        <div class="banner-title">Smart Canteen</div>
+        <div class="banner-sub">AI-powered serving size optimization</div>
+      </div>
+    </div>
+
+    <!-- Two-column grid matching m5_prediction layout -->
+    <div class="main-grid">
+
+      <!-- Left card: upload -->
+      <div class="card">
+        <div class="card-title">
+          <span class="dot blue"></span> Plate Photo Upload
+        </div>
+
+        <p style="font-size:0.88em; color:#777; margin:0 0 12px;">
+          Upload a leftover plate image to update demand and consumption ratios,
+          then recalculate optimized serving sizes.
+        </p>
+
+        <div class="drop-zone" id="dropzone"
+             onclick="document.getElementById('optFileInput').click()"
+             ondragover="event.preventDefault()"
+             ondrop="handleDrop(event)">
+          <input type="file" id="optFileInput" accept="image/*"
+                 style="display:none" onchange="handleFile(this.files[0])">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none"
+               stroke="currentColor" stroke-width="1.2"
+               style="opacity:.35;margin-bottom:8px">
+            <rect x="2" y="3" width="26" height="22" rx="3"/>
+            <circle cx="15" cy="13" r="5"/>
+          </svg>
+          <div class="dz-text">Drag &amp; drop or click to upload</div>
+          <div class="dz-sub">JPG · PNG</div>
+        </div>
+
+        <div id="upload-preview" class="preview-box" style="display:none; margin-top:12px;">
+          <img id="upload-img" src="" alt="uploaded">
+        </div>
+
+        <button class="btn-primary" id="btn-predict"
+                style="margin-top:16px; display:none;"
+                onclick="runOptPredict()">
+          Update Demand &amp; Recalculate
+        </button>
+
+        <div id="opt-status" style="margin-top:10px; font-size:0.88em; color:#888;"></div>
+      </div>
+
+      <!-- Right card: results table -->
+      <div class="card">
+        <div class="card-title">
+          <span class="dot green"></span> Optimized Serving Sizes
+        </div>
+
+        <div id="result-idle" class="idle-msg">
+          Upload a plate photo and click predict to see optimized serving sizes
+        </div>
+
+        <div id="result-body" style="display:none;">
+          <div class="opt-table-wrap">
+            <table class="opt-table">
+              <thead>
+                <tr>
+                  <th>Dish</th>
+                  <th>Price (IDR)</th>
+                  <th>Cost / grams</th>
+                  <th>Demand (Q)</th>
+                  <th>Cons. Ratio</th>
+                  <th>Std Size</th>
+                  <th>Optimized Size</th>
+                </tr>
+              </thead>
+              <tbody id="opt-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Always-visible static table on page load (server-rendered) -->
+        <div id="static-table">
+          {% if dishes %}
+          <div class="opt-table-wrap">
+            <table class="opt-table">
+              <thead>
+                <tr>
+                  <th>Dish</th>
+                  <th>Price (IDR)</th>
+                  <th>Cost / grams</th>
+                  <th>Demand (Q)</th>
+                  <th>Cons. Ratio</th>
+                  <th>Std Size</th>
+                  <th>Optimized Size</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for name, d in dishes.items() %}
+                <tr>
+                  <td>{{ name }}</td>
+                  <td>{{ d.P }}</td>
+                  <td>{{ d.C }}</td>
+                  <td>{{ d.D_base }}</td>
+                  <td>{{ (d.R_i * 100)|int }}%</td>
+                  <td>{{ d.S_base }}g</td>
+                  <td class="optimized-val">{{ optimized[name]|round(2) }}g</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="idle-msg">Upload a plate photo and click predict to see optimized serving sizes</div>
+          {% endif %}
+        </div>
+
+        <div id="price-chart-container" style="margin-top:20px; display:none;">
+            <div class="card-title">
+                <span class="dot green"></span> Std Size vs Optimized Size
+            </div>
+            <canvas id="priceChart" height="120"></canvas>
+        </div>
+
+        <div id="reduction-chart-container" style="margin-top:20px; display:none;">
+            <div class="card-title">
+                <span class="dot green"></span> Serving Size Reduction (%)
+            </div>
+            <canvas id="reductionChart" height="120"></canvas>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+    let sizeChartInstance = null;
+
+    function renderPriceChart(dishes) {
+    const ctx = document.getElementById('priceChart').getContext('2d');
+
+    const labels = dishes.map(d => d.name);
+    const standard = dishes.map(d => d.S_base);
+    const optimized = dishes.map(d => d.optimized);
+
+    if (sizeChartInstance) {
+        sizeChartInstance.destroy();
+    }
+
+    sizeChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+        labels: labels,
+        datasets: [
+            {
+            label: 'Standard Size (g)',
+            data: standard,
+            backgroundColor: '#d7ccc8',   // soft beige (matches background vibe)
+            borderColor: '#8d6e63',
+            borderWidth: 1
+            },
+            {
+            label: 'Optimized Size (g)',
+            data: optimized,
+            backgroundColor: '#6d4c41',   // deep brown (same palette as header)
+            borderColor: '#4e342e',
+            borderWidth: 1
+            }
+        ]
+        },
+        options: {
+        responsive: true,
+        plugins: {
+            legend: {
+            labels: {
+                color: '#4e342e',
+                font: { size: 12 }
+            }
+            }
+        },
+        scales: {
+            x: {
+            ticks: {
+                color: '#5d4037'
+            },
+            grid: {
+                color: '#efebe9'
+            }
+            },
+            y: {
+            beginAtZero: true,
+            ticks: {
+                color: '#5d4037'
+            },
+            grid: {
+                color: '#efebe9'
+            },
+            title: {
+                display: true,
+                text: 'Serving Size (grams)',
+                color: '#5d4037'
+            }
+            }
+        }
+        }
+    });
+
+    document.getElementById('price-chart-container').style.display = 'block';
+    }
+
+    let reductionChartInstance = null;
+
+    function renderReductionChart(dishes) {
+    const ctx = document.getElementById('reductionChart').getContext('2d');
+
+    const labels = dishes.map(d => d.name);
+
+    // % reduction: (optimized - standard) / standard
+    const reduction = dishes.map(d => {
+        if (!d.S_base) return 0;
+        return ((d.optimized - d.S_base) / d.S_base) * 100;
+    });
+
+    if (reductionChartInstance) {
+        reductionChartInstance.destroy();
+    }
+
+    reductionChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+        labels: labels,
+        datasets: [
+            {
+            label: 'Reduction (%)',
+            data: reduction,
+            backgroundColor: reduction.map(v =>
+                v < 0 ? '#a1887f' : '#bcaaa4'   // darker = reduction, lighter = increase
+            ),
+            borderColor: '#5d4037',
+            borderWidth: 1
+            }
+        ]
+        },
+        options: {
+        responsive: true,
+        plugins: {
+            legend: {
+            labels: {
+                color: '#4e342e'
+            }
+            },
+            tooltip: {
+            callbacks: {
+                label: function(context) {
+                return context.raw.toFixed(2) + '%';
+                }
+            }
+            }
+        },
+        scales: {
+            x: {
+            ticks: { color: '#5d4037' },
+            grid: { color: '#efebe9' }
+            },
+            y: {
+            ticks: {
+                color: '#5d4037',
+                callback: value => value + '%'
+            },
+            grid: { color: '#efebe9' },
+            title: {
+                display: true,
+                text: 'Reduction (%)',
+                color: '#5d4037'
+            }
+            }
+        }
+        }
+    });
+
+    document.getElementById('reduction-chart-container').style.display = 'block';
+    }
+  let selectedFile = null;
+
+  function handleFile(file) {
+    if (!file) return;
+    selectedFile = file;
+    const url = URL.createObjectURL(file);
+    document.getElementById('upload-img').src = url;
+    document.getElementById('upload-preview').style.display = 'block';
+    document.getElementById('btn-predict').style.display = 'block';
+    document.getElementById('opt-status').textContent = '';
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  }
+
+  async function runOptPredict() {
+    if (!selectedFile) return;
+
+    const status = document.getElementById('opt-status');
+    const btn = document.getElementById('btn-predict');
+    btn.disabled = true;
+    status.textContent = 'Analysing…';
+
+    const formData = new FormData();
+    formData.append('image', selectedFile);
+
+    try {
+      const resp = await fetch('/optimization/predict_json', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await resp.json();
+
+      if (data.error) {
+        status.textContent = 'Error: ' + data.error;
+        btn.disabled = false;
+        return;
+      }
+
+      // Hide static server-rendered table, show dynamic one
+      document.getElementById('static-table').style.display = 'none';
+      document.getElementById('result-idle').style.display = 'none';
+      document.getElementById('result-body').style.display = 'block';
+
+      const tbody = document.getElementById('opt-tbody');
+      tbody.innerHTML = '';
+      data.dishes.forEach(row => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${row.name}</td>
+            <td>${row.P}</td>
+            <td>${row.C}</td>
+            <td>${row.D_base}</td>
+            <td>${Math.round(row.R_i * 100)}%</td>
+            <td>${row.S_base}g</td>
+            <td class="optimized-val">${row.optimized.toFixed(2)}g</td>
+          </tr>`;
+          renderPriceChart(data.dishes);
+      });
+
+      if (data.updated_dish) {
+        status.textContent = `✓ Updated: ${data.updated_dish} — ratio set to ${(data.new_ratio * 100).toFixed(0)}%`;
+      } else {
+        status.textContent = `⚠ Model predicted "${data.raw_prediction}" — no matching dish found in data. Ratio: ${(data.new_ratio * 100).toFixed(0)}%`;
+      }
+    } catch (err) {
+      status.textContent = 'Request failed: ' + err.message;
+    }
+
+    btn.disabled = false;
+  }
+    window.addEventListener('load', () => {
+    const staticRows = document.querySelectorAll('#static-table tbody tr');
+    if (!staticRows.length) return;
+
+    const dishes = [];
+    staticRows.forEach(row => {
+      const cells = row.querySelectorAll('td');
+      dishes.push({
+        name: cells[0].innerText,
+        S_base: parseFloat(cells[5].innerText),
+        optimized: parseFloat(cells[6].innerText)
+      });
+    });
+
+    renderPriceChart(dishes);
+    renderReductionChart(dishes);
+  });
+</script>
+
+</body>
+</html>

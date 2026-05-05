@@ -30,7 +30,8 @@ MODEL_HANDOFF = os.path.join(BASE_DIR, "Model_Handoff")
 sys.path.insert(0, MODEL_HANDOFF)
 
 import dataset
-dataset.EXCEL_PATH = r"/Users/cynthiaathena/Documents/S2/School/Spring/242B/Project/food detection/Model_Handoff/data_original.xlsx"
+# dataset.EXCEL_PATH = r"/Users/cynthiaathena/Documents/S2/School/Spring/242B/Project/food detection/Model_Handoff/data_original.xlsx"
+dataset.EXCEL_PATH = r"Model_Handoff/data_original.xlsx"
 
 from predict import load_model, predict as m5_predict
 from Serving_Size_Optimization.optimization_engine import run_serving_optimization
